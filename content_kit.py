@@ -238,22 +238,12 @@ def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "
 
 
 def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
-    # Priorité 1 : RapidAPI YouTube Transcript
-    rapidapi_key = os.environ.get("RAPIDAPI_KEY", "")
-    if rapidapi_key:
-        return _get_transcript_rapidapi(video_id, rapidapi_key)
-
-    # Priorité 2 : AssemblyAI (transcription IA de l'audio)
-    assemblyai_key = os.environ.get("ASSEMBLYAI_API_KEY", "")
-    if assemblyai_key:
-        return _get_transcript_assemblyai(video_id, assemblyai_key)
-
-    # Priorité 2 : ScraperAPI (sous-titres YouTube via proxy)
     scraper_api_key = os.environ.get("SCRAPER_API_KEY", "")
     if scraper_api_key:
-        return _get_transcript_scraperapi(video_id, scraper_api_key, target_lang)
+        proxy_url = f"http://scraperapi:{scraper_api_key}@proxy-server.scraperapi.com:8001"
+        os.environ["HTTP_PROXY"] = proxy_url
+        os.environ["HTTPS_PROXY"] = proxy_url
 
-    # Priorité 3 : API YouTube directe (fonctionne en local)
     api = YouTubeTranscriptApi()
     transcript_list = api.list(video_id)
 
