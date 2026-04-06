@@ -36,6 +36,10 @@ try:
 except Exception:
     pass
 
+# Supprime tout proxy résiduel qui bloquerait OAuth et les appels API
+for _pvar in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+    os.environ.pop(_pvar, None)
+
 init_db()
 
 # ---------------------------------------------------------------------------
