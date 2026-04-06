@@ -72,14 +72,17 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
     # Télécharge l'audio dans un fichier temporaire
     tmp_path = tempfile.mktemp(suffix=".mp4")
     ydl_opts = {
-        "format": "worst[ext=mp4]/worstvideo[ext=mp4]/worst/bestaudio/best",
+        "format": "bestaudio/best",
         "outtmpl": tmp_path,
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["ios", "web"],
+            }
+        },
     }
-    if scraper_api_key:
-        ydl_opts["proxy"] = f"http://scraperapi:{scraper_api_key}@proxy-server.scraperapi.com:8001"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
