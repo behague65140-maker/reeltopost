@@ -78,12 +78,28 @@ def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "
     )
     resp.raise_for_status()
 
-    # 2. Extrait les pistes de sous-titres
-    match = _re.search(r'"captionTracks":(\[.*?\])', resp.text)
-    if not match:
-        raise NoTranscriptFound(video_id, [], [])
+    # 2. Extrait les pistes de sous-titres via ytInitialPlayerResponse
+    tracks = []
+    # Méthode 1 : ytInitialPlayerResponse complet
+    m = _re.search(r'ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;', resp.text, _re.DOTALL)
+    if m:
+        try:
+            pr = _json.loads(m.group(1))
+            tracks = (pr.get("captions", {})
+                        .get("playerCaptionsTracklistRenderer", {})
+                        .get("captionTracks", []))
+        except Exception:
+            tracks = []
 
-    tracks = _json.loads(match.group(1))
+    # Méthode 2 : regex directe sur captionTracks
+    if not tracks:
+        m2 = _re.search(r'"captionTracks":(\[.*?\])', resp.text)
+        if m2:
+            try:
+                tracks = _json.loads(m2.group(1))
+            except Exception:
+                tracks = []
+
     if not tracks:
         raise NoTranscriptFound(video_id, [], [])
 
