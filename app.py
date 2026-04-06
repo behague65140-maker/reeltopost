@@ -100,6 +100,8 @@ if "user_picture" not in st.session_state:
     st.session_state.user_picture = None
 if "site_lang" not in st.session_state:
     st.session_state.site_lang = "fr"
+if "_oauth_flow" not in st.session_state:
+    st.session_state._oauth_flow = None
 
 # ---------------------------------------------------------------------------
 # Callback OAuth Google — intercepté avant tout rendu
@@ -108,7 +110,13 @@ _params = st.query_params
 if "code" in _params and st.session_state.user is None:
     with st.spinner("Connexion avec Google…"):
         try:
-            email, name, picture = exchange_code(_params["code"])
+            flow = st.session_state._oauth_flow
+            if flow is None:
+                # Flow perdu (ex: rechargement de page) — on recrée un flow minimal
+                from auth_google import get_auth_url as _gau
+                _, flow = _gau()
+            email, name, picture = exchange_code(_params["code"], flow)
+            st.session_state._oauth_flow = None
             st.session_state.user = get_or_create_user(email, name=name, picture=picture, provider="google")
             st.session_state.user_name = name
             st.session_state.user_picture = picture
@@ -116,6 +124,7 @@ if "code" in _params and st.session_state.user is None:
             st.rerun()
         except Exception as e:
             st.error(f"Erreur d'authentification Google : {e}")
+            st.session_state._oauth_flow = None
             st.query_params.clear()
 
 
@@ -225,7 +234,8 @@ def page_login():
 """.replace("LOGIN_SUB", t("login_sub")), unsafe_allow_html=True)
 
     if google_configured():
-        auth_url = get_auth_url()
+        auth_url, flow = get_auth_url()
+        st.session_state._oauth_flow = flow
         st.markdown(f"""
 <a href="{auth_url}" class="google-btn">
     <svg width="20" height="20" viewBox="0 0 48 48">
@@ -806,7 +816,7 @@ def page_main():
 <div class="plan-price">0€</div>
 <div class="plan-sub">pour toujours</div>
 <div class="plan-feature">✅ 3 kits / mois</div>
-<div class="plan-feature">✅ 6 formats de contenu</div>
+<div class="plan-feature">✅ 3 formats (Blog, Newsletter, X)</div>
 <div class="plan-feature">✅ Téléchargement Markdown</div>
 <div class="plan-feature">❌ Export ZIP</div>
 <div class="plan-feature">❌ Support prioritaire</div>

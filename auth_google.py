@@ -3,7 +3,6 @@ Google OAuth 2.0 — helpers pour ReelToPost
 """
 
 import os
-import urllib.parse
 from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -27,9 +26,8 @@ def _client_config() -> dict:
     }
 
 
-def get_auth_url() -> str:
-    """Retourne l'URL de connexion Google."""
-    # Autorise HTTP en développement local
+def get_auth_url() -> tuple[str, object]:
+    """Retourne (auth_url, flow) — le flow doit être conservé pour exchange_code."""
     os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
     flow = Flow.from_client_config(
@@ -41,21 +39,17 @@ def get_auth_url() -> str:
         prompt="select_account",
         access_type="offline",
     )
-    return auth_url
+    return auth_url, flow
 
 
-def exchange_code(code: str) -> tuple[str, str, str]:
+def exchange_code(code: str, flow) -> tuple[str, str, str]:
     """
     Échange le code OAuth contre les infos utilisateur.
     Retourne (email, name, picture_url).
+    Le flow doit être celui retourné par get_auth_url().
     """
     os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 
-    flow = Flow.from_client_config(
-        _client_config(),
-        scopes=SCOPES,
-        redirect_uri=os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8501"),
-    )
     flow.fetch_token(code=code)
     credentials = flow.credentials
 
