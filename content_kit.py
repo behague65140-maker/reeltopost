@@ -64,23 +64,35 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
     import yt_dlp
     import assemblyai as aai
 
+    import tempfile
+
     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    # Extrait l'URL du flux audio sans télécharger
+    # Télécharge l'audio dans un fichier temporaire
+    tmp_path = tempfile.mktemp(suffix=".mp4")
     ydl_opts = {
         "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "outtmpl": tmp_path,
         "quiet": True,
         "no_warnings": True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(video_url, download=False)
-        audio_url = info.get("url") or info["formats"][-1]["url"]
+        ydl.download([video_url])
 
-    # Transcrit avec AssemblyAI
-    aai.settings.api_key = assemblyai_key
-    config = aai.TranscriptionConfig(speech_models=["universal-2"])
-    transcriber = aai.Transcriber(config=config)
-    transcript = transcriber.transcribe(audio_url)
+    # Cherche le fichier téléchargé (yt-dlp peut changer l'extension)
+    import glob
+    candidates = glob.glob(tmp_path + "*") or glob.glob(tmp_path.replace(".mp4", "") + "*")
+    audio_file = candidates[0] if candidates else tmp_path
+
+    # Transcrit avec AssemblyAI en envoyant le fichier directement
+    try:
+        aai.settings.api_key = assemblyai_key
+        config = aai.TranscriptionConfig(speech_models=["universal-2"])
+        transcriber = aai.Transcriber(config=config)
+        transcript = transcriber.transcribe(audio_file)
+    finally:
+        if os.path.exists(audio_file):
+            os.remove(audio_file)
 
     if transcript.status == aai.TranscriptStatus.error:
         raise Exception(f"Erreur transcription : {transcript.error}")
