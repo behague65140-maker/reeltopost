@@ -660,6 +660,14 @@ def page_main():
         placeholder=t("url_placeholder"),
     )
 
+    # Fallback transcription manuelle si YouTube bloque l'IP
+    manual_transcript = st.text_area(
+        "📋 Ou colle ta transcription ici (si YouTube bloque l'URL)",
+        placeholder="Colle ici le texte de la transcription YouTube...",
+        height=120,
+        help="Va sur youtube.com → ouvre les sous-titres → copie le texte",
+    )
+
     # Quota dépassé
     if user is not None and kits_remaining(user) == 0:
         st.markdown("</div>", unsafe_allow_html=True)
@@ -688,40 +696,47 @@ def page_main():
 
     # --- Génération ---
     if generate_btn:
-        if not url:
+        if not url and not manual_transcript.strip():
             st.error(t("enter_url"))
             st.stop()
 
-        try:
-            video_id = extract_video_id(url)
-        except ValueError:
-            st.error(t("invalid_url"))
-            st.stop()
-
-        with st.status(t("getting_transcript"), expanded=False) as status:
+        # Si transcription manuelle fournie, on l'utilise directement
+        if manual_transcript.strip():
+            transcript = manual_transcript.strip()
+            timestamps = []
+            transcript_ts = transcript
+        else:
             try:
-                transcript, timestamps = get_transcript(video_id, target_lang=output_lang)
-                status.update(
-                    label=t("transcript_ok", n=len(transcript.split())),
-                    state="complete",
-                )
-            except TranscriptsDisabled:
-                status.update(label=t("transcript_disabled"), state="error")
-                st.stop()
-            except NoTranscriptFound:
-                status.update(label=t("transcript_not_found"), state="error")
-                st.stop()
-            except IpBlocked:
-                status.update(label=t("transcript_ip_blocked"), state="error")
-                st.error(t("transcript_ip_msg"))
-                st.stop()
-            except Exception as e:
-                status.update(label=t("transcript_error", e=e), state="error")
+                video_id = extract_video_id(url)
+            except ValueError:
+                st.error(t("invalid_url"))
                 st.stop()
 
-        transcript_ts = "\n".join(
-            f"[{e['timestamp']}] {e['text']}" for e in timestamps
-        )
+            with st.status(t("getting_transcript"), expanded=False) as status:
+                try:
+                    transcript, timestamps = get_transcript(video_id, target_lang=output_lang)
+                    status.update(
+                        label=t("transcript_ok", n=len(transcript.split())),
+                        state="complete",
+                    )
+                except TranscriptsDisabled:
+                    status.update(label=t("transcript_disabled"), state="error")
+                    st.stop()
+                except NoTranscriptFound:
+                    status.update(label=t("transcript_not_found"), state="error")
+                    st.stop()
+                except IpBlocked:
+                    status.update(label=t("transcript_ip_blocked"), state="error")
+                    st.error(t("transcript_ip_msg"))
+                    st.stop()
+                except Exception as e:
+                    status.update(label=t("transcript_error", e=e), state="error")
+                    st.error(f"⚠️ YouTube bloque l'accès depuis ce serveur. **Colle ta transcription manuellement** dans la zone de texte ci-dessus.")
+                    st.stop()
+
+            transcript_ts = "\n".join(
+                f"[{e['timestamp']}] {e['text']}" for e in timestamps
+            )
         client = anthropic.Anthropic(api_key=api_key)
         system_prompt = get_system_prompt(output_lang)
         FREE_KEYS = {"article_blog", "newsletter", "posts_x"}
