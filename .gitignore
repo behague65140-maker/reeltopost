@@ -1,0 +1,20 @@
+# Secrets — ne jamais commiter
+.env
+
+# Base de donnees locale
+.claude/users.db
+
+# Contenu genere
+content-kit/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
