@@ -59,6 +59,23 @@ LANG_CODES = {
 OUTPUT_LANGUAGES = list(LANG_CODES.keys())
 
 
+def _get_transcript_supadata(video_id: str, api_key: str) -> tuple:
+    """Récupère la transcription via Supadata API (contourne le blocage YouTube)."""
+    import requests as _requests
+    resp = _requests.get(
+        "https://api.supadata.ai/v1/youtube/transcript",
+        params={"videoId": video_id, "text": "true"},
+        headers={"x-api-key": api_key},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    text = data.get("content", "") or data.get("text", "")
+    if not text:
+        raise NoTranscriptFound(video_id, [], [])
+    return text, []
+
+
 def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
     """Télécharge l'audio YouTube et le transcrit via AssemblyAI."""
     import yt_dlp
@@ -206,7 +223,12 @@ def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "
 
 
 def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
-    # Priorité 1 : AssemblyAI (transcription IA de l'audio)
+    # Priorité 1 : Supadata (API transcription YouTube dédiée)
+    supadata_key = os.environ.get("SUPADATA_API_KEY", "")
+    if supadata_key:
+        return _get_transcript_supadata(video_id, supadata_key)
+
+    # Priorité 2 : AssemblyAI (transcription IA de l'audio)
     assemblyai_key = os.environ.get("ASSEMBLYAI_API_KEY", "")
     if assemblyai_key:
         return _get_transcript_assemblyai(video_id, assemblyai_key)
