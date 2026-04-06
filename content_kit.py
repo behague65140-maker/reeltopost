@@ -99,16 +99,23 @@ def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "
     if not track_url:
         track_url = tracks[0]["baseUrl"]
 
-    # 4. Télécharge le XML de la transcription via ScraperAPI
-    xml_resp = _requests.get(
-        "https://api.scraperapi.com/",
-        params={"api_key": api_key, "url": track_url},
-        timeout=30,
-    )
+    # 4. Télécharge le XML de la transcription directement (pas de blocage IP sur cet endpoint)
+    xml_resp = _requests.get(track_url + "&fmt=xml", timeout=30, headers={"Accept-Language": "fr-FR,fr;q=0.9"})
+    if xml_resp.status_code != 200 or not xml_resp.content.strip():
+        # Fallback via ScraperAPI
+        xml_resp = _requests.get(
+            "https://api.scraperapi.com/",
+            params={"api_key": api_key, "url": track_url},
+            timeout=30,
+        )
     xml_resp.raise_for_status()
 
+    content = xml_resp.content.strip()
+    if not content:
+        raise NoTranscriptFound(video_id, [], [])
+
     # 5. Parse le XML
-    root = ElementTree.fromstring(xml_resp.content)
+    root = ElementTree.fromstring(content)
     texts, timestamps = [], []
     for elem in root.findall("text"):
         start = float(elem.get("start", 0))
