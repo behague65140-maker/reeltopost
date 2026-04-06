@@ -246,15 +246,21 @@ def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
         proxy_url = f"http://scraperapi:{scraper_api_key}@proxy-server.scraperapi.com:8001"
         os.environ["HTTP_PROXY"] = proxy_url
         os.environ["HTTPS_PROXY"] = proxy_url
-        # Désactive la vérification SSL pour le proxy ScraperAPI
         _orig = _req.Session.request
         def _no_verify(self, *a, **kw):
             kw.setdefault("verify", False)
             return _orig(self, *a, **kw)
         _req.Session.request = _no_verify
 
-    api = YouTubeTranscriptApi()
-    transcript_list = api.list(video_id)
+    try:
+        api = YouTubeTranscriptApi()
+        transcript_list = api.list(video_id)
+    finally:
+        # Supprime les proxy vars pour ne pas perturber les autres appels API
+        for _v in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"]:
+            os.environ.pop(_v, None)
+        if scraper_api_key:
+            _req.Session.request = _orig
 
     transcript = None
     # Priorité : langue cible > français > anglais > tout
