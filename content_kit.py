@@ -72,7 +72,7 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
     # Télécharge l'audio dans un fichier temporaire
     tmp_path = tempfile.mktemp(suffix=".mp4")
     ydl_opts = {
-        "format": "bestaudio/best",
+        "format": "worst[ext=mp4]/worstvideo[ext=mp4]/worst/bestaudio/best",
         "outtmpl": tmp_path,
         "quiet": True,
         "no_warnings": True,
