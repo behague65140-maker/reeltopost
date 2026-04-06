@@ -59,21 +59,34 @@ LANG_CODES = {
 OUTPUT_LANGUAGES = list(LANG_CODES.keys())
 
 
-def _get_transcript_supadata(video_id: str, api_key: str) -> tuple:
-    """Récupère la transcription via Supadata API (contourne le blocage YouTube)."""
+def _get_transcript_rapidapi(video_id: str, api_key: str) -> tuple:
+    """Récupère la transcription via RapidAPI YouTube Transcript."""
     import requests as _requests
     resp = _requests.get(
-        "https://api.supadata.ai/v1/youtube/transcript",
-        params={"videoId": video_id, "text": "true"},
-        headers={"x-api-key": api_key},
+        "https://youtube-transcript3.p.rapidapi.com/api/transcript",
+        params={"videoId": video_id},
+        headers={
+            "X-RapidAPI-Key": api_key,
+            "X-RapidAPI-Host": "youtube-transcript3.p.rapidapi.com",
+        },
         timeout=30,
     )
     resp.raise_for_status()
     data = resp.json()
-    text = data.get("content", "") or data.get("text", "")
-    if not text:
+    # Gère différents formats de réponse
+    if isinstance(data, list):
+        text = " ".join(item.get("text", "") for item in data)
+        timestamps = [
+            {"timestamp": f"{int(item.get('start',0)//60):02d}:{int(item.get('start',0)%60):02d}",
+             "text": item.get("text", "")}
+            for item in data
+        ]
+    else:
+        text = data.get("transcript", "") or data.get("text", "") or str(data)
+        timestamps = []
+    if not text.strip():
         raise NoTranscriptFound(video_id, [], [])
-    return text, []
+    return text, timestamps
 
 
 def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
@@ -223,10 +236,10 @@ def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "
 
 
 def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
-    # Priorité 1 : Supadata (API transcription YouTube dédiée)
-    supadata_key = os.environ.get("SUPADATA_API_KEY", "")
-    if supadata_key:
-        return _get_transcript_supadata(video_id, supadata_key)
+    # Priorité 1 : RapidAPI YouTube Transcript
+    rapidapi_key = os.environ.get("RAPIDAPI_KEY", "")
+    if rapidapi_key:
+        return _get_transcript_rapidapi(video_id, rapidapi_key)
 
     # Priorité 2 : AssemblyAI (transcription IA de l'audio)
     assemblyai_key = os.environ.get("ASSEMBLYAI_API_KEY", "")
