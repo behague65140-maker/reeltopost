@@ -59,7 +59,77 @@ LANG_CODES = {
 OUTPUT_LANGUAGES = list(LANG_CODES.keys())
 
 
+def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "Français") -> tuple:
+    """Récupère la transcription via ScraperAPI pour contourner le blocage YouTube."""
+    import re as _re
+    import json as _json
+    import requests as _requests
+    from xml.etree import ElementTree
+
+    target_codes = LANG_CODES.get(target_lang, ["fr"])
+    preferred = target_codes + ["fr", "en"]
+
+    # 1. Récupère la page YouTube via ScraperAPI
+    yt_url = f"https://www.youtube.com/watch?v={video_id}"
+    resp = _requests.get(
+        "https://api.scraperapi.com/",
+        params={"api_key": api_key, "url": yt_url},
+        timeout=30,
+    )
+    resp.raise_for_status()
+
+    # 2. Extrait les pistes de sous-titres
+    match = _re.search(r'"captionTracks":(\[.*?\])', resp.text)
+    if not match:
+        raise NoTranscriptFound(video_id, [], [])
+
+    tracks = _json.loads(match.group(1))
+    if not tracks:
+        raise NoTranscriptFound(video_id, [], [])
+
+    # 3. Choisit la meilleure piste
+    track_url = None
+    for code in preferred:
+        for track in tracks:
+            if track.get("languageCode", "").startswith(code):
+                track_url = track["baseUrl"]
+                break
+        if track_url:
+            break
+    if not track_url:
+        track_url = tracks[0]["baseUrl"]
+
+    # 4. Télécharge le XML de la transcription via ScraperAPI
+    xml_resp = _requests.get(
+        "https://api.scraperapi.com/",
+        params={"api_key": api_key, "url": track_url},
+        timeout=30,
+    )
+    xml_resp.raise_for_status()
+
+    # 5. Parse le XML
+    root = ElementTree.fromstring(xml_resp.content)
+    texts, timestamps = [], []
+    for elem in root.findall("text"):
+        start = float(elem.get("start", 0))
+        text = _re.sub(r"<[^>]+>", "", elem.text or "").strip()
+        if not text:
+            continue
+        minutes, seconds = int(start // 60), int(start % 60)
+        texts.append(text)
+        timestamps.append({"timestamp": f"{minutes:02d}:{seconds:02d}", "text": text})
+
+    if not texts:
+        raise NoTranscriptFound(video_id, [], [])
+
+    return " ".join(texts), timestamps
+
+
 def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
+    scraper_api_key = os.environ.get("SCRAPER_API_KEY", "")
+    if scraper_api_key:
+        return _get_transcript_scraperapi(video_id, scraper_api_key, target_lang)
+
     api = YouTubeTranscriptApi()
     transcript_list = api.list(video_id)
 
