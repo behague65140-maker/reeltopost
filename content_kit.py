@@ -76,6 +76,7 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
         "outtmpl": tmp_path,
         "quiet": True,
         "no_warnings": True,
+        "nocheckcertificate": True,
     }
     if scraper_api_key:
         ydl_opts["proxy"] = f"http://scraperapi:{scraper_api_key}@proxy-server.scraperapi.com:8001"
