@@ -60,7 +60,15 @@ OUTPUT_LANGUAGES = list(LANG_CODES.keys())
 
 
 def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
-    api = YouTubeTranscriptApi()
+    # Utilise un proxy si configuré (nécessaire sur les serveurs cloud)
+    proxy_user = os.environ.get("WEBSHARE_PROXY_USERNAME", "")
+    proxy_pass = os.environ.get("WEBSHARE_PROXY_PASSWORD", "")
+    if proxy_user and proxy_pass:
+        proxy_url = f"https://{proxy_user}:{proxy_pass}@p.webshare.io:80"
+        proxies = {"https": proxy_url, "http": proxy_url}
+        api = YouTubeTranscriptApi(proxies=proxies)
+    else:
+        api = YouTubeTranscriptApi()
     transcript_list = api.list(video_id)
 
     transcript = None
