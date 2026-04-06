@@ -78,7 +78,7 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
 
     # Transcrit avec AssemblyAI
     aai.settings.api_key = assemblyai_key
-    config = aai.TranscriptionConfig(speech_models=[aai.SpeechModel.universal_2])
+    config = aai.TranscriptionConfig(speech_models=["universal-2"])
     transcriber = aai.Transcriber(config=config)
     transcript = transcriber.transcribe(audio_url)
 
