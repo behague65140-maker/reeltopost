@@ -67,6 +67,7 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
     import tempfile
 
     video_url = f"https://www.youtube.com/watch?v={video_id}"
+    scraper_api_key = os.environ.get("SCRAPER_API_KEY", "")
 
     # Télécharge l'audio dans un fichier temporaire
     tmp_path = tempfile.mktemp(suffix=".mp4")
@@ -76,6 +77,9 @@ def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
         "quiet": True,
         "no_warnings": True,
     }
+    if scraper_api_key:
+        ydl_opts["proxy"] = f"http://scraperapi:{scraper_api_key}@proxy-server.scraperapi.com:8001"
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([video_url])
 
