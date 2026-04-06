@@ -60,14 +60,16 @@ OUTPUT_LANGUAGES = list(LANG_CODES.keys())
 
 
 def _get_transcript_rapidapi(video_id: str, api_key: str) -> tuple:
-    """Récupère la transcription via RapidAPI YouTube Transcript."""
+    """Récupère la transcription via RapidAPI YouTube Transcriber."""
     import requests as _requests
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    host = "youtube-transcribe-fastest-youtube-transcriber.p.rapidapi.com"
     resp = _requests.get(
-        "https://youtube-transcript3.p.rapidapi.com/api/transcript",
-        params={"videoId": video_id},
+        f"https://{host}/transcript",
+        params={"url": video_url, "video_id": video_id, "lang": "fr"},
         headers={
             "X-RapidAPI-Key": api_key,
-            "X-RapidAPI-Host": "youtube-transcript3.p.rapidapi.com",
+            "X-RapidAPI-Host": host,
         },
         timeout=30,
     )
