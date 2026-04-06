@@ -59,6 +59,42 @@ LANG_CODES = {
 OUTPUT_LANGUAGES = list(LANG_CODES.keys())
 
 
+def _get_transcript_assemblyai(video_id: str, assemblyai_key: str) -> tuple:
+    """Télécharge l'audio YouTube et le transcrit via AssemblyAI."""
+    import yt_dlp
+    import assemblyai as aai
+
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    # Extrait l'URL du flux audio sans télécharger
+    ydl_opts = {
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "quiet": True,
+        "no_warnings": True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(video_url, download=False)
+        audio_url = info.get("url") or info["formats"][-1]["url"]
+
+    # Transcrit avec AssemblyAI
+    aai.settings.api_key = assemblyai_key
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(audio_url)
+
+    if transcript.status == aai.TranscriptStatus.error:
+        raise Exception(f"Erreur transcription : {transcript.error}")
+
+    text = transcript.text or ""
+    timestamps = []
+    if hasattr(transcript, "words") and transcript.words:
+        for w in transcript.words:
+            start = w.start / 1000
+            minutes, seconds = int(start // 60), int(start % 60)
+            timestamps.append({"timestamp": f"{minutes:02d}:{seconds:02d}", "text": w.text})
+
+    return text, timestamps
+
+
 def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "Français") -> tuple:
     """Récupère la transcription via ScraperAPI pour contourner le blocage YouTube."""
     import re as _re
@@ -149,10 +185,17 @@ def _get_transcript_scraperapi(video_id: str, api_key: str, target_lang: str = "
 
 
 def get_transcript(video_id: str, target_lang: str = "Français") -> tuple:
+    # Priorité 1 : AssemblyAI (transcription IA de l'audio)
+    assemblyai_key = os.environ.get("ASSEMBLYAI_API_KEY", "")
+    if assemblyai_key:
+        return _get_transcript_assemblyai(video_id, assemblyai_key)
+
+    # Priorité 2 : ScraperAPI (sous-titres YouTube via proxy)
     scraper_api_key = os.environ.get("SCRAPER_API_KEY", "")
     if scraper_api_key:
         return _get_transcript_scraperapi(video_id, scraper_api_key, target_lang)
 
+    # Priorité 3 : API YouTube directe (fonctionne en local)
     api = YouTubeTranscriptApi()
     transcript_list = api.list(video_id)
 
